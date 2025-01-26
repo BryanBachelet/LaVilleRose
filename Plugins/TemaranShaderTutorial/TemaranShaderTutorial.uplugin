@@ -1,0 +1,31 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0",
+  "FriendlyName": "Temaran Shader Tutorial",
+  "Description": "A plugin containing shaders. Intended to be used to understand in simple terms how to make your own shader plugins in UE4.",
+  "Category": "Temaran",
+  "CreatedBy": "Temaran",
+  "CreatedByURL": "https://github.com/Temaran",
+  "MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/d093d65debd844e1a91058ff52385367",
+  "EngineVersion": "4.27.0",
+  "CanContainContent": true,
+  "IsBetaVersion": true,
+  "Installed": false,
+  "EnabledByDefault": true,
+
+    "Modules": [
+        {
+            "Name": "CustomShadersDeclarations",
+            "Type": "Runtime",
+            "LoadingPhase": "PostConfigInit",
+            "WhitelistPlatforms": [ "Win64", "Win32", "Linux" ]
+        },
+        {
+            "Name": "CustomComputeShader",
+            "Type": "Runtime",
+            "LoadingPhase": "Default",
+            "WhitelistPlatforms": [ "Win64", "Win32", "Linux" ]
+        }
+    ]
+}

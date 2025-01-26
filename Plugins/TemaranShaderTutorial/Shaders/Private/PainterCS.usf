@@ -1,0 +1,93 @@
+#include "/Engine/Public/Platform.ush"
+struct BrushData
+{
+	float3 BrushUV;
+	float3 originUV;
+	float  BrushSize ;
+	int IsBlue;
+	int isActive;
+};	
+
+
+#define PI 3.14
+
+RWStructuredBuffer<BrushData> BrushBuffer;
+RWTexture3D<float4> VolumeTexture;
+int computeMax;
+float offsetUV;
+int cubeSizeThread;
+float WorldTime;
+float3 Dimensions;
+
+[numthreads(THREADGROUPSIZE_X, THREADGROUPSIZE_X, THREADGROUPSIZE_Z)]
+void MainComputeShader(uint3 Gid : SV_GroupID,              //atm: -, 0...256, - in rows (Y)        --> current group index (dispatched by c++)
+					   uint3 DTid : SV_DispatchThreadID,    //atm: 0...256 in rows & columns (XY)   --> "global" thread id
+					   uint3 GTid : SV_GroupThreadID,       //atm: 0...256, -,- in columns (X)      --> current threadId in group / "local" threadId
+					   uint GI : SV_GroupIndex)             //atm: 0...256 in columns (X)           --> "flattened" index of a thread within a group)
+{
+
+	uint uniqueID = GI  + (Gid.x  * THREADGROUPSIZE_X * THREADGROUPSIZE_Y) + (Gid.y  * (cubeSizeThread) *  THREADGROUPSIZE_X * THREADGROUPSIZE_Y) ;
+	
+	if(uniqueID > computeMax)
+	{
+		return;
+	}
+
+	uint lineMaxCount =cubeSizeThread * THREADGROUPSIZE_X;  
+	uint UyI = uniqueID /lineMaxCount;
+	
+	for (int i = 0; i < MAX_BRUSH; i++)
+	{
+		if(BrushBuffer[i].isActive == 0)
+			continue;
+		
+			BrushBuffer[i].BrushUV.z *= 0.2;
+		
+		
+		float3 uv = BrushBuffer[i].originUV ;
+		uv.y = BrushBuffer[i].originUV.y + UyI * offsetUV;
+		uv.x =  BrushBuffer[i].originUV.x + offsetUV * (uniqueID - (UyI * lineMaxCount));
+		uv = clamp(uv, 0, 1);
+		for (int z = 0; z <Dimensions.z; z++)
+		{
+			uv.z = z/ Dimensions.z;
+			uint3 texcoord = uint3(uv*Dimensions);
+			texcoord.z = z;
+			float4 outputTex = VolumeTexture[texcoord];
+			uv.z *= 0.2;
+			//outputTex.g = 0;
+			
+			float brushValue = clamp(1 - ( distance(uv, BrushBuffer[i].BrushUV) / (BrushBuffer[i].BrushSize  )) , 0, 1);
+		
+			brushValue =   brushValue   ; 
+			if (BrushBuffer[i].IsBlue == 1)
+			{
+				outputTex.r -= brushValue;
+				//outputTex.b += brushValue;
+			}
+			else
+			{
+				outputTex.r += brushValue;
+				//outputTex.b -= brushValue;
+			}
+
+			// if (WorldTime <= 0.05f)
+            // {
+            //     outputTex.g = outputTex.a = 0;
+            // }
+            
+            if (brushValue > 0.1f)
+            {
+                outputTex.b = max(WorldTime / 0x0FFF, outputTex.b);
+            }
+			
+			//outputTex.r = 1;
+			VolumeTexture[texcoord] =  clamp(outputTex, 0, 1);
+		}
+	}
+	
+	
+	
+	
+	
+}

@@ -1,0 +1,95 @@
+﻿
+#include "/Engine/Public/Platform.ush"
+struct  FCombatPaintData
+{
+	
+	int offset;
+	int verticesCount;
+	int IsRed;
+	
+	
+};
+RWTexture2D<float4> renderTarget;
+RWStructuredBuffer<FCombatPaintData> paintShapeData;
+RWStructuredBuffer<float3> verticesData;
+int brushCount;
+float3 Dimensions;
+int isFirstTime;
+
+uint mod (uint index, uint divider)
+ {
+ 	return  index - divider * floor(index/divider);
+ }
+
+float ComputeInside(int inside )
+{
+	float value =   1.0f - 1.0f * inside;
+	return value;
+}
+
+
+
+[numthreads(THREADGROUPSIZE_X, THREADGROUPSIZE_Y, THREADGROUPSIZE_Z)]
+void MainComputeShader(uint3 Gid : SV_GroupID,              //atm: -, 0...256, - in rows (Y)        --> current group index (dispatched by c++)
+					   uint3 DTid : SV_DispatchThreadID,    //atm: 0...256 in rows & columns (XY)   --> "global" thread id
+					   uint3 GTid : SV_GroupThreadID,       //atm: 0...256, -,- in columns (X)      --> current threadId in group / "local" threadId
+					   uint GI : SV_GroupIndex)
+{
+	uint2 dimension2D =  uint2(Dimensions.x,Dimensions.y);
+	uint2 texcoord = uint2(DTid.x,DTid.y);
+	float2 uvPixel= texcoord / 1024.0f;
+
+	if(isFirstTime)  renderTarget[texcoord] =  float4(0,0,0,1);
+	
+	for (int j = 0 ; j <= brushCount ; j++ )
+	{
+		FCombatPaintData shape =  paintShapeData[j];
+		
+		float3  p1 = verticesData[shape.offset];
+		float4 outputTex = renderTarget[texcoord];
+		bool inside = false;
+		
+		for (int i = 1 ; i <= shape.verticesCount   ; i++ )
+		{
+			uint  indexP2 = mod (i,shape.verticesCount);
+			float3 p2 = verticesData[shape.offset+ indexP2];
+
+			if (uvPixel.y > min(p1.y, p2.y))
+			{
+				if (uvPixel.y <= max(p1.y, p2.y))
+				{
+					if (uvPixel.x <= max(p1.x, p2.x))
+					{
+						
+						float x_intersection= ((uvPixel.y - p1.y) * (p2.x - p1.x))/ (p2.y - p1.y) + p1.x;
+						
+						if (p1.x == p2.x || uvPixel.x <= x_intersection)
+						{
+							inside = !inside ;
+						
+						}
+					}
+				}
+			}
+			
+			p1 = p2;
+		}
+
+		if(shape.IsRed)
+		{
+			outputTex.r += clamp(outputTex.r +inside,0,1);
+			outputTex.b -= clamp(outputTex.r + inside,0,1);
+		}
+		else
+		{
+			outputTex.b += clamp(outputTex.b + inside,0,1);
+			outputTex.r -= clamp(outputTex.b + inside,0,1);
+
+		}
+
+		//outputTex.r  =1;
+		renderTarget[texcoord] =  outputTex;
+		
+	}
+
+}
